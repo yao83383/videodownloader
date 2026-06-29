@@ -42,7 +42,14 @@ class YtDlpRunner(private val context: Context) {
 
     private fun ffmpegPath(): File {
         val dir = context.getExternalFilesDir(null) ?: context.filesDir
-        return File(dir, "ffmpeg_arm64")
+        val f = File(dir, "ffmpeg_arm64")
+        if (!f.exists()) {
+            context.assets.open("ffmpeg_arm64").use { input ->
+                f.outputStream().use { output -> input.copyTo(output) }
+            }
+            f.setExecutable(true)
+        }
+        return f
     }
 
     suspend fun getVideoInfo(url: String): VideoInfo = withContext(Dispatchers.IO) {

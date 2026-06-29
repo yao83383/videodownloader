@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">口语听力素材学习辅助工具</string>
+    <string name="quality_best">最佳质量</string>
+    <string name="quality_1080">1080p</string>
+    <string name="quality_720">720p</string>
+    <string name="quality_480">480p</string>
+    <string name="quality_audio">仅MP3</string>
+</resources>

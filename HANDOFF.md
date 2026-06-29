@@ -209,3 +209,51 @@ npm run release               # 出安装包 + 免安装包
 tar -czf release/server-deploy.tar.gz -C server --exclude=node_modules --exclude=data .
 ```
 详细操作步骤、部署更新方法见 **`OPERATIONS.md`**。
+
+---
+
+## 11. GitHub 分支
+
+| 分支 | 内容 |
+|------|------|
+| `main` | 免费版 v1.1.0(桌面版,Electron) |
+| `globalControlVersion` | 免费版 + kill-switch(遥控关闭) |
+| `apk` | 同上 + Android Kotlin/Compose 完整工程 + Chaquopy(Python+yt-dlp) |
+
+## 12. Android (APK) 分支状态 ⚠️ 进行中
+
+### 已完成
+- Kotlin + Jetpack Compose 完整 UI(URL 输入/解析/画质/下载列表)
+- Chaquopy 集成(Python 3.14 + yt-dlp pip 安装 → bionic 原生兼容)
+- YouTube WebView 登录(读 SQLite Cookie 数据库→ 27 条 Cookie 已通)
+- Kill-switch(和桌面版共享 `status.json`)
+- APK 构建通过(`./gradlew assembleRelease` → ~110MB)
+
+### ⚠️ 卡住:YouTube 下载格式报错
+**现象**:`ERROR: Requested format is not available`
+**根因**:YouTube 对不同客户端(web/android/ios)返回**不同的格式子集**。桌面版用 yt-dlp standalone binary(默认 web client)→ 完整 DASH 格式列表→ `bv*+ba/b` 能匹配。Chaquopy 环境下的 yt-dlp 可能默认用了 Android client→ 返回精简格式列表→ `bv*`/`bestvideo*` 找不到匹配。
+
+**已尝试(均无效)**:
+- `bv*+ba/b`、`best`、`18/best`、`bestvideo*+bestaudio/best` 多种格式串
+- `player_client: web/ios/android` + `player_skip: []` 强制客户端
+- `--upgrade yt-dlp` 最新版 + `extractPackages`
+- 桌面版全套参数 `-S vcodec:h264,res,acodec:aac` + `merge_output_format mp4`
+- 桌面 UA `Chrome/124 ... Windows NT 10.0`
+- 三层兜底 `/b/best` 链式格式
+
+**当前代码(apk 分支)**:`android/app/src/main/python/downloader.py` 已含桌面版完整参数 + 三层兜底。**下次尝试方向**:`--list-formats` 对比 PC/Android 两端实际返回的格式 ID 差异,根据 Android 端实际可用的 format_id 定制选择器。
+
+## 13. APK 构建速查
+
+```bash
+cd android
+./gradlew assembleRelease
+# 产物: app/build/outputs/apk/release/app-release-unsigned.apk
+# 签名: apksigner sign --ks debug.keystore ...
+```
+
+yt-dlp + ffmpeg 二进制需预放 `app/src/main/assets/`:
+- `ytdlp_arm64`(Chaquopy 已替代,不需要)
+- `ffmpeg_arm64`(bionic ARM64,47.7MB,当前是 glibc 版→需替换为 Termux/Android 原生编译版)
+
+详见 `android/README.md`。

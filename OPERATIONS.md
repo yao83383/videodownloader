@@ -220,6 +220,26 @@ cat /root/vd-license/data/status.json
 - 断网用户不受影响(无网时不追责)
 - `status.json` 放在 Docker 数据卷的 `/data/` 内,与 `licenses.json` 同一目录
 
+---
+## 九、Android APK 构建与调试
+
+### 构建
+```bash
+cd android && ./gradlew assembleRelease
+# 签名:
+$ANDROID_HOME/build-tools/34.0.0/apksigner sign --ks debug.keystore --out app-release.apk app-release-unsigned.apk
+```
+
+### 当前卡住的问题
+YouTube 下载报 `Requested format is not available`。根因:Chaquopy 环境下的 yt-dlp 拿到的格式列表**与桌面版(web client)不同**(Android client 返回精简格式子集)。桌面版 `bv*+ba/b` 选择器在这些精简格式中找不到匹配。
+
+**调试思路**:
+1. 在 downloader.py 里加一行日志,打印 `list(f["format_id"] for f in info["formats"])`
+2. 对比 Android 和 PC 实际拿到的 format_id 列表差异
+3. 根据差异定制 Android 专用格式选择器(或修复 Chaquopy 环境使 yt-dlp 返回完整格式)
+
+详细状态见 `HANDOFF.md` 第 12 节。
+
 ### 服务器常用 Docker 命令
 ```bash
 docker compose -f /root/vd-license/docker-compose.yml ps

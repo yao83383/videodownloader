@@ -1,0 +1,10 @@
+node_modules
+private.pem
+public.pem
+licenses.json
+data
+Dockerfile
+docker-compose.yml
+.dockerignore
+.gitignore
+*.log

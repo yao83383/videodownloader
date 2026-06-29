@@ -1,0 +1,14 @@
+{
+  "name": "videodownloader-license-server",
+  "version": "0.1.0",
+  "description": "License verification server (Ed25519 signed) for the video downloader app.",
+  "main": "server.js",
+  "scripts": {
+    "genkeys": "node genkeys.js",
+    "start": "node server.js"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}

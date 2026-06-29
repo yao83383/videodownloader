@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>视频下载器 · 自助充值</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background: #14161c; color: #e7e9ee; margin: 0; padding: 24px; min-height: 100vh; }
+      .container { max-width: 700px; margin: 0 auto; }
+      h1 { font-size: 22px; margin: 0 0 6px; }
+      .sub { color: #9aa1b1; font-size: 13px; margin: 0 0 28px; }
+      .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; margin-bottom: 24px; }
+      .card { background: #1e2129; border: 1px solid #2e323d; border-radius: 12px; padding: 20px; text-align: center; cursor: pointer; transition: border .15s; }
+      .card:hover { border-color: #4f8cff; }
+      .card .name { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+      .card .price { font-size: 28px; font-weight: 700; color: #4f8cff; }
+      .card .price sub { font-size: 14px; }
+      .card .desc { color: #9aa1b1; font-size: 13px; margin-top: 8px; }
+      .card.selected { border-color: #4f8cff; box-shadow: 0 0 0 2px rgba(79,140,255,.25); }
+      .btn { background: #4f8cff; border: none; border-radius: 8px; color: #fff; font-size: 15px; padding: 12px 28px; cursor: pointer; width: 100%; }
+      .btn:disabled { opacity: .5; cursor: not-allowed; }
+      .pay-panel { display: none; background: #1e2129; border: 1px solid #2e323d; border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 24px; }
+      .pay-panel img { width: 200px; height: 200px; border-radius: 8px; background: #fff; margin: 12px 0; }
+      .pay-panel .qr-url { color: #9aa1b1; font-size: 12px; word-break: break-all; }
+      .pay-panel .order { color: #9aa1b1; font-size: 12px; margin-top: 6px; }
+      .result { display: none; background: #1e2129; border: 1px solid #34c759; border-radius: 12px; padding: 24px; text-align: center; }
+      .result .key { font-size: 20px; font-family: Consolas, monospace; word-break: break-all; margin: 12px 0; }
+      .error { color: #ff5b5b; font-size: 14px; margin-top: 16px; }
+      .warn { display: block; margin-top: 16px; padding: 12px 16px; border: 1px solid #e6d36a; border-radius: 8px; color: #e6d36a; font-size: 14px; font-weight: 600; text-align: center; background: rgba(230,211,106,.08); }
+      .note { color: #9aa1b1; font-size: 13px; margin-top: 12px; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>获取学习辅助下载工具授权码</h1>
+      <p class="sub">选择套餐并支付后，自动生成授权码。在桌面软件"激活"页面输入即可使用。</p>
+
+      <div class="cards" id="cards"></div>
+
+      <div class="pay-panel" id="payPanel">
+        <h3 style="margin:0">请扫码支付</h3>
+        <img id="qrImg" alt="支付二维码" />
+        <p class="qr-url" id="qrUrl"></p>
+        <p class="order" id="orderId"></p>
+        <p class="note">支付后请勿关闭本页面，稍等几秒会自动获取授权码</p>
+      </div>
+
+      <div class="result" id="resultPanel">
+        <h3 style="margin:0 0 12px">充值成功！</h3>
+        <p class="note">您的授权码（即微信/支付宝支付流水号，请立即复制）：</p>
+        <div class="key" id="resultKey"></div>
+        <button class="btn" id="copyKey" style="margin:8px 0">复制</button>
+        <p class="note" style="text-align:center">即使关闭本页面，此码也永久保存在 微信→我→服务→钱包→账单 或 支付宝→账单 中，可随时查看。</p>
+        <p class="note" style="text-align:center">去软件右上角点"激活"输入上方授权码即可使用。</p>
+        <p class="note" id="txInfo" style="display:none"></p>
+      </div>
+
+      <p class="note" style="text-align:center;margin-top:32px">
+        仅支持微信 / 支付宝扫码。支付遇到问题请联系客服。
+      </p>
+    </div>
+
+    <script>
+      async function api(method, path, body) {
+        const opts = { method, headers: body === undefined ? {} : { 'Content-Type': 'application/json' } };
+        if (body !== undefined) opts.body = JSON.stringify(body);
+        const r = await fetch(path, opts);
+        return r.json();
+      }
+
+      async function pollStatus(orderId) {
+        for (let i = 0; i < 75; i++) {
+          await new Promise((r) => setTimeout(r, 2000));
+          try {
+            const s = await api('GET', `/order/status?orderId=${orderId}`);
+            if (s.paid) return s;
+          } catch { /* continue */ }
+        }
+        return { paid: false, msg: '等待超时（若已付款请联系客服）' };
+      }
+
+      let selectedPlan = null;
+
+      async function loadPlans() {
+        try {
+          const r = await fetch('/order/packages');
+          return r.json();
+        } catch {
+          return [
+            { id: 'monthly', name: '月度套餐', price: 15.9, days: 30 },
+            { id: 'quarterly', name: '季度套餐', price: 39.9, days: 90 },
+            { id: 'halfyear', name: '半年套餐', price: 70, days: 180 },
+            { id: 'yearly', name: '年度套餐', price: 99.9, days: 365 },
+          ];
+        }
+      }
+
+      async function init() {
+        const pkgs = await loadPlans();
+        const c = document.getElementById('cards');
+        c.innerHTML = '';
+        pkgs.forEach((p) => {
+          const card = document.createElement('div');
+          card.className = 'card';
+          card.innerHTML = `<div class="name">${p.name}</div><div class="price">¥${p.price}<sub></sub></div><div class="desc">${p.days}天 · 不限次</div>`;
+          card.addEventListener('click', () => {
+            document.querySelectorAll('.card').forEach((el) => el.classList.remove('selected'));
+            card.classList.add('selected');
+            selectedPlan = p;
+            document.getElementById('payPanel').style.display = 'none';
+            document.getElementById('resultPanel').style.display = 'none';
+          });
+          c.appendChild(card);
+        });
+
+        // 支付按钮由选中卡片自动触发→监听选中后点购买按钮
+        // 这里不需要单独的购买按钮；选中套餐后显示下一步指引
+      }
+
+      init();
+
+      // 选中套餐后，显示确认按钮和支付方式
+      const confirmBtn = document.createElement('button');
+      confirmBtn.className = 'btn';
+      confirmBtn.textContent = '确认购买 →';
+      confirmBtn.style.display = 'none';
+      confirmBtn.style.marginTop = '16px';
+      document.getElementById('cards').after(confirmBtn);
+
+      const payTypeDiv = document.createElement('div');
+      payTypeDiv.id = 'paytype';
+      payTypeDiv.style.display = 'none';
+      payTypeDiv.style.marginTop = '12px';
+      payTypeDiv.style.textAlign = 'center';
+      payTypeDiv.style.color = '#9aa1b1';
+      payTypeDiv.style.fontSize = '14px';
+      payTypeDiv.innerHTML = `
+        支付方式：
+        <label style="margin:0 12px;cursor:pointer;color:#e7e9ee">
+          <input type="radio" name="paytype" value="native" checked /> 微信
+        </label>
+        <label style="margin:0 12px;cursor:pointer;color:#e7e9ee">
+          <input type="radio" name="paytype" value="alipay" /> 支付宝
+        </label>
+      `;
+      confirmBtn.after(payTypeDiv);
+
+      confirmBtn.addEventListener('click', async () => {
+        if (!selectedPlan) return;
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = '下单中…';
+        try {
+          const payType = (document.querySelector('input[name="paytype"]:checked') || {}).value || 'native';
+          const r = await api('POST', '/order/create', { plan: selectedPlan.id, pay_type: payType });
+          if (!r.ok) { alert(r.error || '下单失败'); confirmBtn.disabled = false; confirmBtn.textContent = '确认购买 →'; return; }
+
+          document.getElementById('payPanel').style.display = 'block';
+          document.getElementById('resultPanel').style.display = 'none';
+          document.getElementById('qrImg').src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(r.qr || '')}`;
+          document.getElementById('qrUrl').textContent = r.qr || '';
+          document.getElementById('orderId').textContent = '订单号：' + r.orderId;
+
+          const result = await pollStatus(r.orderId);
+          if (result.paid && result.key) {
+            document.getElementById('payPanel').style.display = 'none';
+            document.getElementById('resultPanel').style.display = 'block';
+            document.getElementById('resultKey').textContent = result.key;
+          } else {
+            alert(result.msg || '未收到付款确认，若已付款请联系客服并提供订单号：' + r.orderId);
+          }
+        } catch (e) {
+          alert('网络错误：' + e.message);
+        } finally {
+          confirmBtn.disabled = false;
+          confirmBtn.textContent = '确认购买 →';
+        }
+      });
+
+      // 卡片选中时显示确认按钮和支付方式
+      document.getElementById('cards').addEventListener('click', () => {
+        if (selectedPlan) {
+          confirmBtn.style.display = 'block';
+          payTypeDiv.style.display = 'block';
+        }
+      });
+
+      document.getElementById('copyKey').addEventListener('click', async () => {
+        const k = document.getElementById('resultKey').textContent;
+        if (!k) return;
+        try { await navigator.clipboard.writeText(k); }
+        catch {
+          const ta = document.createElement('textarea'); ta.value = k; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+        }
+        const btn = document.getElementById('copyKey');
+        btn.textContent = '已复制';
+        setTimeout(() => (btn.textContent = '复制授权码'), 1500);
+      });
+    </script>
+  </body>
+</html>

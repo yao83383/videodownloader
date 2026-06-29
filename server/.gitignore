@@ -1,0 +1,7 @@
+﻿node_modules/
+private.pem
+public.pem
+licenses.json
+orders.json
+data/
+*.log

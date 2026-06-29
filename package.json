@@ -1,0 +1,53 @@
+{
+  "name": "videodownloader",
+  "version": "1.0.1",
+  "description": "A desktop video downloader (YouTube / Bilibili) powered by yt-dlp.",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/copy-assets.js",
+    "start": "npm run build && electron .",
+    "dev": "npm run build && electron .",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "pack": "npm run build && electron-builder --dir",
+    "dist": "npm run build && electron-builder",
+    "portable": "node scripts/make-portable.js",
+    "release": "npm run dist && npm run portable"
+  },
+  "author": "starluck",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3",
+    "typescript": "^5.4.5"
+  },
+  "dependencies": {
+    "ffmpeg-static": "^5.2.0",
+    "yt-dlp-wrap": "^2.3.12"
+  },
+  "build": {
+    "appId": "com.starluck.videodownloader",
+    "productName": "VideoDownloader",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "**/node_modules/ffmpeg-static/**"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false
+    }
+  }
+}

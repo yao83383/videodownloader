@@ -1,0 +1,7 @@
+node_modules/
+dist/
+release/
+key/
+payinfo/
+*.log
+.DS_Store

@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline';" />
+    <title>学习听力辅助工具</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="license" class="overlay hidden">
+      <div class="overlay__card">
+        <h2>下载需要授权</h2>
+        <p id="licenseMsg" class="overlay__msg">输入授权码即可下载（解析和预览免费）</p>
+        <input id="licenseKey" type="text" placeholder="请输入授权码，例如 VD-XXXX-XXXX-XXXX" />
+        <button id="licenseActivate" class="primary">激活</button>
+        <button id="licenseClose" class="ghost">稍后再说</button>
+        <p class="overlay__device">本机设备码：<span id="deviceId">…</span></p>
+        <p id="licenseExpiry" class="overlay__device"></p>
+      </div>
+    </div>
+
+    <header>
+      <div class="topright">
+        <div class="devbadge">设备码 <span id="deviceCode" class="devcode">…</span><button id="copyDevice" class="linkbtn">复制</button></div>
+        <div id="licenseBadge" class="badge hidden"></div>
+      </div>
+      <h1>学习听力辅助工具</h1>
+      <p class="subtitle">视频 · YouTube / 哔哩哔哩 ｜ 音乐 · 网易云 / 酷狗 / QQ 音乐 (基于 yt-dlp)</p>
+    </header>
+
+    <div id="status" class="status status--pending">正在准备下载引擎 (首次运行会下载 yt-dlp)…</div>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="video">视频下载</button>
+      <button class="tab" data-tab="music">音乐下载</button>
+    </div>
+
+    <!-- ====== 视频面板 ====== -->
+    <section id="tab-video" class="panel tab-panel">
+      <div class="row">
+        <input id="url" type="text" placeholder="粘贴视频链接，例如 https://www.youtube.com/watch?v=..." />
+        <button id="parse">解析</button>
+      </div>
+
+      <div id="card" class="card hidden">
+        <img id="thumb" alt="thumbnail" />
+        <div class="card__body">
+          <div id="title" class="card__title"></div>
+          <div id="meta" class="card__meta"></div>
+          <button id="preview" class="linkbtn">▶ 网页预览</button>
+        </div>
+      </div>
+
+      <div class="row options">
+        <label>画质 <select id="quality"></select></label>
+        <label>Cookie 来源 <select id="cookies">
+          <option value="">自动获取（推荐）</option>
+          <option value="edge">Edge</option>
+          <option value="chrome">Chrome</option>
+          <option value="firefox">Firefox</option>
+          <option value="brave">Brave</option>
+          <option value="opera">Opera</option>
+          <option value="vivaldi">Vivaldi</option>
+        </select></label>
+      </div>
+
+      <div class="row">
+        <button id="chooseCookies">选 Cookie 文件</button>
+        <input id="cookiesFile" type="text" readonly placeholder="未选择 cookies.txt" />
+        <button id="clearCookies">清除</button>
+      </div>
+
+      <div class="row">
+        <button id="loginBili">应用内登录 B站</button>
+        <button id="loginYoutube">应用内登录 YouTube</button>
+        <span class="hint">登录一次即可，之后自动使用</span>
+      </div>
+
+      <div class="row">
+        <button id="loginDouyin" disabled>应用内登录 抖音</button>
+        <span class="hint">抖音下载暂不可用</span>
+      </div>
+    </section>
+
+    <!-- ====== 音乐面板 ====== -->
+    <section id="tab-music" class="panel tab-panel hidden">
+      <div class="row">
+        <input id="url-music" type="text" placeholder="粘贴音乐链接，例如 https://music.163.com/song?id=..." />
+        <button id="parse-music">解析</button>
+      </div>
+
+      <div id="card-music" class="card hidden">
+        <img id="thumb-music" alt="cover" />
+        <div class="card__body">
+          <div id="title-music" class="card__title"></div>
+          <div id="meta-music" class="card__meta"></div>
+          <button id="preview-music" class="linkbtn">▶ 网页预览</button>
+        </div>
+      </div>
+
+      <div class="row options">
+        <label>音质 <select id="quality-music">
+          <option value="music_mp3" selected>MP3（推荐）</option>
+          <option value="music_flac">FLAC 无损</option>
+        </select></label>
+        <span class="hint">VIP 歌曲需先登录</span>
+      </div>
+
+      <div class="row">
+        <button id="loginNetease">登录 网易云</button>
+        <button id="loginKugou">登录 酷狗</button>
+        <button id="loginQQMusic">登录 QQ音乐</button>
+        <span class="hint">登录一次即可，VIP 歌曲自动使用</span>
+      </div>
+
+      <div class="row">
+        <span class="hint">免费版权下载，如遇到无法解析有版权限制 · 单曲/歌单/专辑均可下载</span>
+      </div>
+    </section>
+
+    <!-- ====== 共用区域 ====== -->
+    <div class="row">
+      <input id="dir" type="text" readonly placeholder="保存目录" />
+      <button id="choose">选择目录</button>
+    </div>
+
+    <button id="download" class="primary" disabled>开始下载</button>
+    <button id="update" class="ghost">更新 yt-dlp（抖音等失效时修复）</button>
+
+    <section class="panel">
+      <h2>下载列表</h2>
+      <div id="list" class="list"><div class="empty">暂无下载任务</div></div>
+    </section>
+
+    <script src="renderer.js"></script>
+  </body>
+</html>

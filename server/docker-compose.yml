@@ -1,0 +1,29 @@
+services:
+  license:
+    build: .
+    container_name: vd-license
+    restart: always
+    ports:
+      # 只绑服务器本机回环；公网由 Nginx(443/HTTPS) 反代到这里。外网无法直连 8090。
+      - "127.0.0.1:8090:8090"
+    environment:
+      # ★ 改成你自己的强口令（后台登录用，长随机串）
+      ADMIN_TOKEN: "firstproj"
+      # ★ 后台“秘密路径”，改成不可猜的串；后台地址即 https://你的域名/<这个值>
+      ADMIN_PATH: "console-change-me-9f3a2x7k"
+      PORT: "8090"
+      MAX_DEVICES: "1"
+      # XorPay 支付
+      XORPAY_APP_ID: "705942"
+      XORPAY_APP_SECRET: "36cd884ed9b3478896ecd15197621863"
+      BASE_URL: "https://license-videodownload.justsaysayforfun.com"
+      # 自助充值套餐（JSON 数组；字段 id/name/price/days；可选 quota）
+      PACKAGES: '[{"id":"monthly","name":"月度套餐","price":15.9,"days":30},{"id":"quarterly","name":"季度套餐","price":39.9,"days":90},{"id":"halfyear","name":"半年套餐","price":70,"days":180},{"id":"yearly","name":"年度套餐","price":99.9,"days":365}]'
+      # 授权数据持久化到容器外的卷，重建容器也不丢
+      LICENSES_PATH: "/data/licenses.json"
+      ORDERS_PATH: "/data/orders.json"
+    volumes:
+      # 授权码数据（持久化，务必保留）
+      - ./data:/data
+      # 签名私钥（只读挂载，不打进镜像）
+      - ./private.pem:/app/private.pem:ro

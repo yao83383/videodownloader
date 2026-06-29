@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>授权管理后台</title>
+    <style>
+      body { font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; max-width: 1000px; margin: 24px auto; padding: 0 16px; color: #222; }
+      h1 { font-size: 20px; }
+      .bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+      input, button { padding: 8px 10px; font-size: 14px; border: 1px solid #ccc; border-radius: 6px; }
+      button { cursor: pointer; background: #f4f4f4; }
+      button.primary { background: #2d7ef7; color: #fff; border-color: #2d7ef7; }
+      table { width: 100%; border-collapse: collapse; font-size: 13px; }
+      th, td { border: 1px solid #e3e3e3; padding: 6px 8px; text-align: left; }
+      th { background: #fafafa; }
+      .muted { color: #888; }
+      .expired { color: #c00; }
+      .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+      code { background: #f3f3f3; padding: 1px 4px; border-radius: 4px; }
+    </style>
+  </head>
+  <body>
+    <h1>授权管理后台</h1>
+    <div class="bar">
+      管理员令牌：<input id="token" type="text" placeholder="ADMIN_TOKEN" style="width:240px" />
+      <button class="primary" onclick="refresh()">刷新列表</button>
+      <span class="muted">（下方列表用于查看/续期/停用/查询，会自动加载）</span>
+    </div>
+
+    <div class="bar">
+      生成 <input id="genCount" type="number" value="1" min="1" style="width:70px" /> 个，
+      有效期 <input id="genDays" type="number" value="30" min="1" style="width:80px" /> 天，
+      次数 <input id="genQuota" type="number" min="0" placeholder="不限" style="width:70px" />，
+      备注 <input id="genNote" placeholder="客户名/备注" style="width:160px" />
+      <button onclick="gen()">生成授权码</button>
+    </div>
+
+    <div class="bar">
+      按设备码查询：<input id="lookupDevice" placeholder="粘贴客户发来的设备码" style="width:340px" />
+      <button onclick="lookup()">查询状态</button>
+    </div>
+    <div id="lookupResult" class="muted" style="margin-bottom:16px"></div>
+
+    <table>
+      <thead>
+        <tr><th>授权码</th><th>设备码</th><th>到期(本地时间)</th><th>状态</th><th>已绑定设备</th><th>次数</th><th>来源</th><th>备注</th><th>操作</th></tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const token = () => $('token').value.trim();
+      async function api(path, body) {
+        const res = await fetch(path, {
+          method: body ? 'POST' : 'GET',
+          headers: { 'Content-Type': 'application/json', 'x-admin-token': token() },
+          body: body ? JSON.stringify(body) : undefined,
+        });
+        if (!res.ok) throw new Error((await res.json()).error || res.status);
+        return res.json();
+      }
+      function fmt(iso) {
+        if (!iso) return '<span class="muted">永久</span>';
+        const d = new Date(iso);
+        const s = d.toLocaleString();
+        return d.getTime() < Date.now() ? `<span class="expired">${s}(已过期)</span>` : s;
+      }
+      async function refresh() {
+        try {
+          const data = await api('/admin/list');
+          const tbody = $('rows');
+          tbody.innerHTML = '';
+          Object.keys(data).forEach((key) => {
+            const r = data[key];
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td><code>${key}</code></td>
+              <td><code style="font-size:11px;color:#555">${(r.devices || []).join('<br>') || '—'}</code></td>
+              <td>${fmt(r.expiry)}</td>
+              <td>${r.disabled ? '<span class="expired">停用</span>' : '启用'}</td>
+              <td>${(r.devices || []).length} 台</td>
+              <td>${typeof r.quota === 'number' ? ((r.used || 0) + '/' + r.quota) : '<span class="muted">不限</span>'}</td>
+              <td>${r.source === 'recharge' ? ('自助<span class="muted" title="订单 ' + (r.orderId || '') + '">' + (new Date(r.createdAt).toLocaleDateString()) + '</span>') : '手动'}</td>
+              <td>${r.note || ''}</td>
+              <td class="row-actions">
+                <button onclick="extend('${key}',30)">+30天</button>
+                <button onclick="extend('${key}',365)">+1年</button>
+                <button onclick="setDate('${key}')">设到期日</button>
+                <button onclick="setQuota('${key}')">设次数</button>
+                <button onclick="resetUsed('${key}')">重置已用</button>
+                <button onclick="toggle('${key}',${!r.disabled})">${r.disabled ? '启用' : '停用'}</button>
+                <button onclick="resetDev('${key}')">重置设备</button>
+              </td>`;
+            tbody.appendChild(tr);
+          });
+        } catch (e) { alert('失败：' + e.message); }
+      }
+      async function gen() {
+        try {
+          const qv = $('genQuota').value.trim();
+          const r = await api('/admin/gen', { count: +$('genCount').value, days: +$('genDays').value, note: $('genNote').value, quota: qv === '' ? null : +qv });
+          alert('已生成：\n' + r.created.join('\n'));
+          refresh();
+        } catch (e) { alert('失败：' + e.message); }
+      }
+      async function extend(key, days) {
+        try {
+          const data = await api('/admin/list');
+          const cur = data[key].expiry ? new Date(data[key].expiry).getTime() : Date.now();
+          const base = cur < Date.now() ? Date.now() : cur;
+          await api('/admin/set', { key, expiry: new Date(base + days * 86400000).toISOString() });
+          refresh();
+        } catch (e) { alert('操作失败：' + e.message); }
+      }
+      async function setDate(key) {
+        const v = prompt('设置到期日 (格式 2026-12-31)：');
+        if (!v) return;
+        const m = /^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/.exec(v.trim());
+        if (!m) { alert('日期格式不对，请用 2026-12-31'); return; }
+        const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 23, 59, 59);
+        if (isNaN(d.getTime())) { alert('无效日期：' + v); return; }
+        try {
+          await api('/admin/set', { key, expiry: d.toISOString() });
+          alert('已设置到期日：' + d.toLocaleDateString());
+          refresh();
+        } catch (e) { alert('设置失败：' + e.message); }
+      }
+      async function toggle(key, disabled) {
+        try { await api('/admin/set', { key, disabled }); refresh(); }
+        catch (e) { alert('操作失败：' + e.message); }
+      }
+      async function resetDev(key) {
+        if (!confirm('清除该码的设备绑定？')) return;
+        try { await api('/admin/reset-device', { key }); refresh(); }
+        catch (e) { alert('操作失败：' + e.message); }
+      }
+      async function setQuota(key) {
+        const v = prompt('设置总下载次数（留空 = 不限次）：');
+        if (v === null) return;
+        const t = v.trim();
+        const quota = t === '' ? null : Number(t);
+        if (t !== '' && (isNaN(quota) || quota < 0)) { alert('请输入非负整数，或留空表示不限'); return; }
+        try {
+          await api('/admin/set', { key, quota, used: 0 });
+          alert(t === '' ? '已设为不限次' : ('已设次数：' + quota + ' 次'));
+          refresh();
+        } catch (e) { alert('设置失败：' + e.message); }
+      }
+      async function resetUsed(key) {
+        if (!confirm('把已用次数清零（相当于充满）？')) return;
+        try { await api('/admin/set', { key, used: 0 }); refresh(); }
+        catch (e) { alert('操作失败：' + e.message); }
+      }
+      async function lookup() {
+        const device = $('lookupDevice').value.trim();
+        if (!device) return;
+        try {
+          const r = await api('/admin/lookup?device=' + encodeURIComponent(device));
+          if (!r.matches.length) {
+            $('lookupResult').innerHTML = '<span class="expired">未找到该设备码（可能尚未激活，或码填错）</span>';
+            return;
+          }
+          $('lookupResult').innerHTML = r.matches.map((m) => {
+            const state = m.disabled ? '<span class="expired">已停用</span>' : (m.expired ? '<span class="expired">已过期</span>' : '正常');
+            return `授权码 <code>${m.key}</code> ｜ 到期 ${fmt(m.expiry)} ｜ 状态 ${state} ｜ 备注 ${m.note || '-'}`;
+          }).join('<br>');
+        } catch (e) { alert('失败：' + e.message); }
+      }
+
+      // 记住令牌（明文保存在本机浏览器），打开页面自动加载列表
+      $('token').value = localStorage.getItem('adminToken') || '';
+      $('token').addEventListener('input', () => localStorage.setItem('adminToken', $('token').value.trim()));
+      if ($('token').value) refresh();
+    </script>
+  </body>
+</html>

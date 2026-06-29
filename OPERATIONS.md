@@ -187,6 +187,39 @@ certbot --nginx -d 你的域名
 | 打包 winCodeSign 报错 | 开 Windows 开发者模式,或以管理员运行终端 |
 | 证书快到期 | certbot 自动续期(一般不用管)；手动续: `certbot renew --force-renewal` |
 
+---
+
+## 八、遥控关闭 / 开放服务（kill-switch）
+
+> 一键关掉所有正在使用的客户端,或重新放行。不需要重启 Docker,不需要重打包客户端。
+
+### 关掉所有客户端
+SSH 登录服务器后:
+```bash
+echo '{"ok":false,"msg":"软件已停止服务，感谢使用"}' > /root/vd-license/data/status.json
+```
+所有在线客户端在 **6 小时内**陆续被锁(解析和下载均被拦截,顶部显示"软件已停止服务,感谢使用")。
+
+### 重新开放
+```bash
+rm /root/vd-license/data/status.json
+```
+文件不存在 = 放行。客户端在 6 小时内恢复使用。
+
+### 查看当前状态
+```bash
+cat /root/vd-license/data/status.json
+```
+- 显示 `{"ok":false,...}` → 当前已关闭
+- 显示 `{"ok":true}` → 开放中
+- 文件不存在 → 开放中(默认)
+
+### 说明
+- 改文件即生效,不需要重启 Docker、不需要重打包客户端
+- 客户端每 **6 小时**静默检查一次
+- 断网用户不受影响(无网时不追责)
+- `status.json` 放在 Docker 数据卷的 `/data/` 内,与 `licenses.json` 同一目录
+
 ### 服务器常用 Docker 命令
 ```bash
 docker compose -f /root/vd-license/docker-compose.yml ps

@@ -118,8 +118,8 @@ Docker + `docker-compose.yml`。容器 `restart: always`。
 | POST | `/order/create` | 无 | 创建支付订单 |
 | GET | `/order/status?orderId=` | 无 | 轮询订单状态/获取授权码 |
 | POST | `/pay-callback` | XorPay 验签 | 支付异步通知 |
-
-### 4.4 数据在哪
+| GET | `/status.json` | 无 | 全局遥控开关(kill-switch) |
+| GET | `/<ADMIN_PATH>` | 无(页面) | 管理后台页面 |
 **不是数据库**,就是两个 JSON 文件,都在 Docker 宿主的 `./data/` 卷里：
 | 文件 | 用途 |
 |------|------|

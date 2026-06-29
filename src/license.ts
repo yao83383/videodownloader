@@ -9,7 +9,7 @@ import { app } from 'electron';
 
 // ===== 配置：部署你的服务器后填这里 =====
 // 你的授权服务器地址（不要带结尾斜杠）
-export const SERVER_URL = 'https://license-videodownload.justsaysayforfun.com';
+export const SERVER_URL = '';
 // 与服务器 private.pem 配对的公钥（Ed25519）
 export const LICENSE_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
 MCowBQYDK2VwAyEAuemEb6vqFfhcaAzB3fsILdSaX7OobiZAeboYj26wk08=

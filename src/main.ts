@@ -15,7 +15,7 @@ function createWindow(): void {
     height: 720,
     minWidth: 680,
     minHeight: 520,
-    title: 'Video Downloader',
+    title: '口语听力素材学习辅助工具',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,

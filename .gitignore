@@ -5,3 +5,4 @@ key/
 payinfo/
 *.log
 .DS_Store
+*cookies.txt

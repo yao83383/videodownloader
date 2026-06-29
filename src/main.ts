@@ -4,6 +4,7 @@ import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron';
 import { Downloader, DownloadRequest, ProgressData, CookieOpts } from './downloader';
 import { harvestCookies, siteKey, openLoginWindow, siteHome } from './cookies';
 import { computeStatus, activate, beginDownload, refund } from './license';
+import { checkSwitch, isBlocked, getBlockMessage } from './remote-switch';
 
 let mainWindow: BrowserWindow | null = null;
 let downloader: Downloader;
@@ -128,6 +129,7 @@ function registerIpc(): void {
   });
 
   ipcMain.handle('app:get-video-info', async (_e, url: string, opts?: CookieOpts) => {
+    if (isBlocked()) throw new Error(getBlockMessage());
     await readyPromise;
     const resolved = await resolveCookies(url, opts);
     return downloader.getVideoInfo(url, resolved);
@@ -142,6 +144,7 @@ function registerIpc(): void {
   });
 
   ipcMain.handle('app:start-download', async (_e, req: DownloadRequest) => {
+    if (isBlocked()) throw new Error(getBlockMessage());
     await readyPromise;
     const gate = await beginDownload();
     if (!gate.ok) throw new Error(gate.reason || '无法下载');
@@ -185,6 +188,7 @@ app.whenReady().then(() => {
 
   registerIpc();
   createWindow();
+  checkSwitch().catch(() => undefined);
   computeStatus().catch(() => undefined);
 
   app.on('activate', () => {

@@ -96,6 +96,16 @@ app.use(express.urlencoded({ extended: true }));
 // 健康检查
 app.get('/', (_req, res) => res.type('text').send('VideoDownloader License Server OK'));
 
+// 全局遥控开关：放一个 status.json 在数据目录，改它就能关掉所有客户端
+const STATUS_PATH = path.join(path.dirname(LICENSES_PATH), 'status.json');
+app.get('/status.json', (_req, res) => {
+  try {
+    res.json(JSON.parse(fs.readFileSync(STATUS_PATH, 'utf8')));
+  } catch {
+    res.json({ ok: true });
+  }
+});
+
 // 管理后台页面：只在“秘密路径”下提供（由 ADMIN_PATH 决定），不在 /admin 暴露页面
 app.get(['/' + ADMIN_PATH, '/' + ADMIN_PATH + '/'], (_req, res) =>
   res.sendFile(path.join(__dirname, 'public', 'admin.html'))

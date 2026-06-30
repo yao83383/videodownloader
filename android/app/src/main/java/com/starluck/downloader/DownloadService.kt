@@ -22,13 +22,15 @@ class DownloadService : Service() {
 
     data class DownloadItem(
         val id: String,
+        val url: String = "",
         var title: String,
         var status: String = "waiting",  // downloading / processing / done / error
         var percent: Float = 0f,
         var speed: String = "",
         var size: String = "",
         var eta: String = "",
-        var error: String? = null
+        var error: String? = null,
+        var file: String? = null
     )
 
     override fun onCreate() {

@@ -218,42 +218,40 @@ tar -czf release/server-deploy.tar.gz -C server --exclude=node_modules --exclude
 |------|------|
 | `main` | 免费版 v1.1.0(桌面版,Electron) |
 | `globalControlVersion` | 免费版 + kill-switch(遥控关闭) |
-| `apk` | 同上 + Android Kotlin/Compose 完整工程 + Chaquopy(Python+yt-dlp) |
+| `apk` | 同上 + Android APK 完整工程(Chaquopy + QuickJS + FFmpeg, YouTube/B站可用) |
 
-## 12. Android (APK) 分支状态 ⚠️ 进行中
+## 12. Android (APK) 分支状态 ✅ 已通
 
-### 已完成
-- Kotlin + Jetpack Compose 完整 UI(URL 输入/解析/画质/下载列表)
-- Chaquopy 集成(Python 3.14 + yt-dlp pip 安装 → bionic 原生兼容)
-- YouTube WebView 登录(读 SQLite Cookie 数据库→ 27 条 Cookie 已通)
+YouTube / B 站下载均可用，进度实时显示，与 PC 端对齐。
+
+### 技术栈
+- Kotlin + Jetpack Compose 完整 UI(URL 输入/解析/画质/下载列表/进度条)
+- Chaquopy 3.14 + yt-dlp(pip) + yt-dlp-ejs(pip)
+- YouTube WebView 登录(SQLite Cookie 数据库导出 Netscape 格式)
+- **CookieRefresher**：每次下载前用 invisible WebView 访问 youtube.com 让 YouTube rotate cookies 再重新导出(等价于 PC 端 `harvestCookies`)
+- **QuickJS-NG(libqjs.so)**：解 YouTube 的 sig/n JS challenge
+- **FFmpeg-NDKr28(libffmpeg.so)**：bv+ba merge 成 mp4
 - Kill-switch(和桌面版共享 `status.json`)
-- APK 构建通过(`./gradlew assembleRelease` → ~110MB)
 
-### ⚠️ 卡住:YouTube 下载格式报错
-**现象**:`ERROR: Requested format is not available`
-**根因**:YouTube 对不同客户端(web/android/ios)返回**不同的格式子集**。桌面版用 yt-dlp standalone binary(默认 web client)→ 完整 DASH 格式列表→ `bv*+ba/b` 能匹配。Chaquopy 环境下的 yt-dlp 可能默认用了 Android client→ 返回精简格式列表→ `bv*`/`bestvideo*` 找不到匹配。
+### YouTube 下载链路的关键修复(走过的坑)
+1. **解析阶段**：`extract_info(download=False)` 默认仍会触发 format 选择→`Requested format is not available`。修复：`process=False`。
+2. **Cookies rotation**：手动登录导出的 cookies 几小时后被 YouTube rotate 失效→只剩 storyboard。修复：`CookieRefresher` 每次下载前实时刷新。
+3. **JS challenge 解算**：YouTube 2025+ 强制 sig/n challenge，无 JS runtime → 只返回 storyboard。修复：
+   - `qjs-linux-aarch64`(quickjs-ng 0.15.1, static-pie) 作为 `libqjs.so` 放进 `jniLibs/arm64-v8a/`
+   - 必须配 `extractNativeLibs="true"` + `packaging.jniLibs.useLegacyPackaging=true`，否则 APK 内 .so 不解压到 nativeLibraryDir，子进程无法 exec
+   - yt-dlp 通过 `js_runtimes={'quickjs': {'path': '/abs/path/to/libqjs.so'}}` 绕过文件名检查(默认要求文件名是 `qjs`)
+4. **Challenge solver 脚本**：pip 装的 yt-dlp 不带 solver JS，需 `pip install yt-dlp-ejs` 提供 `lib.min.js` + `core.min.js`
+5. **FFmpeg bionic 兼容**：原 47.7MB glibc 静态 ffmpeg 在 Android 跑不动。换成 `hzw1199/Android-FFmpeg-Prebuilt`(NDK r28, 15.5MB dynamic+linker64) 做为 `libffmpeg.so` 同样放 `jniLibs/arm64-v8a/`。`ffmpeg_location` 指向 `libffmpeg.so`，yt-dlp 在文件名中匹配子串 `ffmpeg` 识别为 basename。
 
-**已尝试(均无效)**:
-- `bv*+ba/b`、`best`、`18/best`、`bestvideo*+bestaudio/best` 多种格式串
-- `player_client: web/ios/android` + `player_skip: []` 强制客户端
-- `--upgrade yt-dlp` 最新版 + `extractPackages`
-- 桌面版全套参数 `-S vcodec:h264,res,acodec:aac` + `merge_output_format mp4`
-- 桌面 UA `Chrome/124 ... Windows NT 10.0`
-- 三层兜底 `/b/best` 链式格式
-
-**当前代码(apk 分支)**:`android/app/src/main/python/downloader.py` 已含桌面版完整参数 + 三层兜底。**下次尝试方向**:`--list-formats` 对比 PC/Android 两端实际返回的格式 ID 差异,根据 Android 端实际可用的 format_id 定制选择器。
-
-## 13. APK 构建速查
-
+### APK 构建
 ```bash
 cd android
-./gradlew assembleRelease
-# 产物: app/build/outputs/apk/release/app-release-unsigned.apk
-# 签名: apksigner sign --ks debug.keystore ...
+# 用 E:\gradle-8.7\bin\gradle assembleRelease（项目无 wrapper）
+gradle assembleRelease
+# 产物：app/build/outputs/apk/release/app-release-unsigned.apk(~120MB)
+# debug 签名：apksigner sign --ks debug.keystore --ks-pass pass:android \
+#             --key-pass pass:android --ks-key-alias debug <apk>
+# 安装：adb install -r <apk>
 ```
 
-yt-dlp + ffmpeg 二进制需预放 `app/src/main/assets/`:
-- `ytdlp_arm64`(Chaquopy 已替代,不需要)
-- `ffmpeg_arm64`(bionic ARM64,47.7MB,当前是 glibc 版→需替换为 Termux/Android 原生编译版)
-
-详见 `android/README.md`。
+`assets/` 目录已清空(原 `ytdlp_arm64`+`ffmpeg_arm64` 已被 Chaquopy/jniLibs 替代)。所有 native 二进制放 `jniLibs/arm64-v8a/`。

@@ -11,7 +11,9 @@
         android:maxSdkVersion="32" />
 
     <application
+        android:name=".App"
         android:allowBackup="true"
+        android:extractNativeLibs="true"
         android:icon="@mipmap/ic_launcher"
         android:label="口语听力素材学习辅助工具"
         android:supportsRtl="true"
@@ -26,6 +28,11 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".YouTubeLoginActivity"
+            android:exported="false"
+            android:label="登录 YouTube" />
 
         <service
             android:name=".DownloadService"
